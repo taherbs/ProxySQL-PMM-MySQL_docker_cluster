@@ -1,0 +1,80 @@
+version: "2.0"
+services:
+  # Master SQL instance
+  mysqlmaster:
+    image: mysql:5.7
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./conf/mysql/mysqlmaster:/etc/mysql/conf.d
+    networks:
+      - lan
+    depends_on:
+      - pmm-server
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+  # Slave 1 SQL instance
+  mysqlslave1:
+    image: mysql:5.7
+    ports:
+      - "13307:3306"
+    volumes:
+      - ./conf/mysql/mysqlslave1:/etc/mysql/conf.d
+    networks:
+      - lan
+    depends_on:
+      - mysqlmaster
+      - pmm-server
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+  # Slave 1 SQL instance
+  mysqlslave2:
+    image: mysql:5.7
+    ports:
+      - "13308:3306"
+    volumes:
+      - ./conf/mysql/mysqlslave2:/etc/mysql/conf.d
+    networks:
+      - lan
+    depends_on:
+      - mysqlmaster
+      - pmm-server
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+
+  # proxysql instance
+  proxysql:
+    build:
+        context: ./
+        dockerfile: ./docker/proxysql/Dockerfile
+    ports:
+      - "16033:6033"
+      - "16032:6032"
+      - "16080:6080"
+    environment:
+      - ENABLE_PMM_MONITORING=true
+      - PMM_SERVER=pmm-server
+      - PROXYSQL_STATS_PORT=6032
+    volumes:
+      - ./conf/proxysql/proxysql.cnf:/etc/proxysql.cnf
+      - ./conf/pmm-client/supervisord.conf:/etc/supervisord.conf
+      - ./conf/pmm-client/pmm-client-conf.sh:/pmm-client-conf.sh
+    depends_on:
+      - mysqlmaster
+      - mysqlslave1
+      - mysqlslave2
+      - pmm-server
+    networks:
+      - lan
+
+  # PMM server
+  pmm-server:
+    image: percona/pmm-server
+    restart: always
+    ports:
+        - "8080:80"
+    networks:
+      - lan
+
+networks:
+  lan:
